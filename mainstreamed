@@ -1,5 +1,5 @@
 local mainstreamed = {
-    build = 'private',
+    build = 'skibiditoiletohiorizzmonke',
     game = 'lone survival',
 }
 if (_G.mainstreamed_injected) then
