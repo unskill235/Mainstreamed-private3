@@ -1,0 +1,1832 @@
+local mainstreamed = {
+    build = 'private',
+    game = 'lone survival',
+}
+if (_G.mainstreamed_injected) then
+    return
+end
+-- localisation
+local tost = tostring
+local spawn = task.spawn
+local drawing_new = Drawing.new
+local instance_new = Instance.new
+local colour3_new = Color3.new
+local colour3_fromrgb = Color3.fromRGB
+local colour3_fromhsv = Color3.fromHSV
+local vector3_new = Vector3.new
+local vector2_new = Vector2.new
+local cframe_new = CFrame.new
+local cframe_lookat = CFrame.lookAt
+local cframe_fromorientation = CFrame.fromOrientation
+local coloursequencekeypoint_new = ColorSequenceKeypoint.new
+local numbersequencekeypoint_new = NumberSequenceKeypoint.new
+local table_insert = table.insert
+local table_remove = table.remove
+local math_huge = math.huge
+local math_floor = math.floor
+local math_abs = math.abs
+local math_max = math.max
+local math_min = math.min
+local math_random = math.random
+local math_round = math.round
+local camera = workspace.CurrentCamera
+-- services
+local workspace = game:GetService('Workspace')
+local terrain = workspace:FindFirstChildOfClass('Terrain')
+local players = game:GetService('Players')
+local soundservice = game:GetService('SoundService')
+local runservice = game:GetService('RunService')
+local userinputservice = game:GetService('UserInputService')
+local lighting = game:GetService('Lighting')
+local usergamesettings = UserSettings():GetService('UserGameSettings')
+local replicatedstorage = game:GetService('ReplicatedStorage')
+local coregui = game:GetService('CoreGui')
+local httpservice = game:GetService('HttpService')
+--other shit
+local renderstepped = runservice.RenderStepped
+local local_player = players.LocalPlayer
+local name = local_player.Name
+local displayname = local_player.Name
+local mouse = local_player:GetMouse()
+local viewportsize = camera.ViewportSize
+local middleofscreen = vector2_new(camera.ViewportSize.X / 2, camera.ViewportSize.Y / 2)
+local uninject_table = {
+    connections = {},
+    drawings = {},
+    parts = {},
+}
+local rand_emojis = {'😍','😂','😁','💋','😜','💖','✨','😋','😎','🙄','😓','🤬','🤧','🤡','👽','🤖','😻','🤩','😆','😭','👺','🙈','🙊','👀','🐓','🕊','🦿','🦴','🐢','🦒','🦂','🕷','🦈','🐿','🦠','🐠','🐉','🙀','🦇','🐰','🐖','🐼','🦌','🦖','🦜','🐀','🙄','😫'}
+local rand_strs = {'a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','1', '2', '3', '4', '5', '6', '7', '8','9', '0'}
+local rand_all = {'😍','😂','😁','💋','😜','💖','✨','😋','😎','🙄','😓','🤬','🤧','🤡','👽','🤖','😻','🤩','😆','😭','👺','🙈','🙊','👀','🐓','🕊','🦿','🦴','🐢','🦒','🦂','🕷','🦈','🐿','🦠','🐠','🐉','🙀','🦇','🐰','🐖','🐼','🦌','🦖','🦜','🐀','🙄','😫','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w','x','y','z','A','B','C','D','E','F','G','H','I','J','K','L','M','N','O','P','Q','R','S','T','U','V','W','X','Y','Z','1', '2', '3', '4', '5', '6', '7', '8','9', '0'}
+local function randEmojis(strSize)
+	strSize = strSize or 16
+	local emoji_str = ''
+	for i = 1, strSize do
+		emoji_str = emoji_str .. rand_emojis[math_random(1, #rand_emojis)]
+	end
+	return emoji_str
+end
+local function randStr(strSize)
+	strSize = strSize or 16
+	local str = ''
+	for i = 1, strSize do
+		str = str .. rand_strs[math_random(1, #rand_strs)]
+	end
+	return str
+end
+local function randAll(strSize)
+	strSize = strSize or 16
+	local str = ''
+	for i = 1, strSize do
+		str = str .. rand_all[math_random(1, #rand_all)]
+	end
+	return str
+end
+-- http
+local library = loadstring(game:HttpGet('https://raw.githubusercontent.com/unskill235/privatescript/main/superproultraui'))()
+local theme_manager = loadstring(game:HttpGet('https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/ThemeManager.lua'))()
+local save_manager = loadstring(game:HttpGet('https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/addons/SaveManager.lua'))()
+local drawing_manager = loadstring(game:HttpGet('https://raw.githubusercontent.com/Mainstreamed/Roblox/main/Drawing%20Manager'))()
+local window = library:CreateWindow({
+	Title = 'mainstreamed '..mainstreamed.build,
+	Center = true,
+	AutoShow = true,
+})
+local function unloadAll()
+    --disable toggles
+    do
+        for _, toggle in next, Toggles do
+            toggle:SetValue(false)
+        end
+    end
+    -- disable script stuff
+    do
+        for _, connection in next, uninject_table.connections do
+            if (not connection.Disconnected) then
+                connection:Disconnect()
+            end
+        end
+        for _, drawing in next, uninject_table.drawings do
+            drawing:Remove()
+        end
+        for _, part in next, uninject_table.parts do
+            part:Destroy()
+        end
+    end
+    _G.mainstreamed_injected = false
+    --destroy ui
+    library:Unload()
+end
+local watermark = drawing_new('Text')
+local sounds_list = {}
+local framework
+local functions
+-- general functions
+do
+    functions = {}
+    function functions:worldtoviewport(position, offsetx, offsety)
+        offsetx = offsetx or 0
+        offsety = offsety or 0
+        local screen_pos, on_screen = camera:WorldToViewportPoint(position)
+        return vector2_new(screen_pos.X + offsetx, screen_pos.Y + offsety), on_screen, screen_pos.Z
+    end
+    function functions:worldtoscreenpoint(position, offsetx, offsety)
+        offsetx = offsetx or 0
+        offsety = offsety or 0
+        local screen_pos, on_screen = camera:WorldToScreenPoint(position)
+        return vector2_new(screen_pos.X + offsetx, screen_pos.Y + offsety), on_screen, screen_pos.Z
+    end
+    function functions:calculate_magnitude(position1, position2)
+        local position2 = position2 or camera.CFrame.Position
+        local horizontal_offset, vertical_offset
+        if (tost(typeof(position1)) == 'Vector3') then
+            horizontal_offset = (position1 * vector3_new(1, 0, 1) - position2 * vector3_new(1, 0, 1)).Magnitude
+            vertical_offset = math_abs(position1.Y - position2.Y)
+        end
+        local _magnitude = (position1 - position2).Magnitude
+        return math_round(_magnitude), _magnitude, horizontal_offset, vertical_offset
+    end
+    function functions:is_visible(part_pos, ignore_model, start_pos, ignore_list)
+        ignore_list = ignore_list or {}
+        start_pos = start_pos or camera.CFrame.Position
+        local cframe_direction = cframe_new(start_pos, part_pos)
+        local raycast_params = RaycastParams.new()
+        raycast_params.FilterDescendantsInstances = {local_player.Character, camera, workspace.Ignored}
+        raycast_params.FilterType = Enum.RaycastFilterType.Exclude
+        raycast_params.IgnoreWater = true
+        for index, value in next, ignore_list do
+            --***
+        end
+        local result = workspace:Raycast(start_pos, cframe_direction.LookVector * 9999, raycast_params)
+        if (result and (result.Instance:IsDescendantOf(ignore_model) or result.Instance == ignore_model)) then
+            return true
+        end
+        return false
+    end
+    function functions:getfunction(funcnames)
+        if (typeof(funcnames) == 'string') then
+            for index, func in next, getgc() do
+                if (typeof(func) == 'function' and string.lower(getinfo(func).name) == string.lower(funcnames)) then
+                    return func
+                end
+            end
+        elseif (typeof(funcnames) == 'table') then
+            local func_list = {}
+            for index, func in next, getgc() do
+                if (typeof(func) == 'function') then
+                    local name = string.lower(getinfo(func).name)
+                    if (func_list[name]) then
+                        local indx = 1
+                        while true do
+                            if (not func_list[name..tost(indx)]) then
+                                func_list[name..tost(indx)] = func
+                                break
+                            end
+                            indx = indx + 1
+                        end
+                    else
+                        func_list[name] = func
+                    end
+                end
+            end
+            return func_list
+        end
+    end
+end
+-- lone survival framework
+do
+    framework = {
+        variables = {
+            players = workspace.Players,
+            sleepers = workspace.OfflinePlayers,
+            modules = replicatedstorage.Modules,
+            remote_event = replicatedstorage.Remotes.RemoteEvent,
+            playerdata = getrenv()._G.PlayerData,
+            ignored = workspace.Ignored,
+            tools = replicatedstorage.Assets.Prefabs.Tools,
+        },
+        players = {},
+        settings = {
+            killaura_onCooldown = 0,
+            spamsound_onCooldown = false,
+            oldArms = {},
+            killaura_circle = false,
+        },
+        localPlayer = {},
+        bypass = {
+            instances = {
+                Lighting = {
+                    Ambient = {
+                        value = lighting.Ambient,
+                    },
+                    FogEnd = {
+                        value = lighting.FogEnd,
+                    },
+                    FogStart = {
+                        value = lighting.FogStart,
+                    },
+                    GlobalShadows = {
+                        value = lighting.GlobalShadows,
+                    },
+                },
+            },
+            attributes = {
+                FieldOfView = {
+                    value = camera.FieldOfView,
+                    condition = 'fov_changed',
+                },
+                Gravity = {
+                    value = workspace.Gravity,
+                },
+                WalkSpeed = {
+                    value = local_player.Character.Humanoid.WalkSpeed,
+                },
+            },
+            conditions = {
+                fov_changed = false,
+            },
+        },
+        drawings = {
+            crosshair = drawing_manager:CreateCircle({Visible = false, Radius = 2, Filled = true, ZIndex = 3}),
+            silent_fov_circle = drawing_manager:CreateCircle({Visible = false, Radius = 150, ZIndex = 3}),
+            silent_snapline = drawing_manager:CreateLine({Visible = false, ZIndex = 3}),
+        },
+        esp = {
+            fonts = {
+                system = 0,
+                plex = 2,
+                monospace = 3,
+            },
+        },
+        target = {
+            killaura_rangecircle = instance_new('MeshPart', workspace.Ignored),
+            silent = {},
+        },
+    }
+    --range circle shit
+    do
+        --thanks vape :)
+        framework.target.killaura_rangecircle.MeshId = 'rbxassetid://3726303797'
+        framework.target.killaura_rangecircle.CanCollide = false
+        framework.target.killaura_rangecircle.Anchored = true
+        framework.target.killaura_rangecircle.Material = Enum.Material.Neon
+        table_insert(uninject_table.parts, framework.target.killaura_rangecircle)
+    end
+    framework.old_playerdata = {}
+    for index, value in next, framework.variables.playerdata do
+        framework.old_playerdata[index] = value
+    end
+    framework.sounds = {}
+    for _, sound in next, replicatedstorage.Assets.Sounds:GetDescendants() do
+        if (sound:IsA('Sound')) then
+            local name = tost(sound.Parent)..tost(sound)
+            table_insert(sounds_list, name)
+            framework.sounds[name] = sound
+        end
+    end
+end
+-- framework functions
+do
+    function framework:mouse_getclosest()
+        local stored = {
+            silent_aim = {distance = math_huge},
+        }
+        local mouse_position = framework.settings.mouse_position
+        for _, model in next, framework.variables.players:GetChildren() do
+            if (model ~= local_player.Character) then
+                local head = model:FindFirstChild('Head')
+                if (head and model.Humanoid.Health > 0) then
+                    if (Toggles.silent_toggle.Value) then
+                        local settings = {
+                            visible_check = Toggles.silent_visible_check.Value,
+                            limit_distance = Toggles.silent_limit_distance.Value,
+                            fov_distance = framework.drawings.silent_fov_circle.Radius,
+                            checks = {
+                                within_fov = false,
+                                distance_limit = math_huge,
+                                hitboxes = {},
+                                vector2_distance = {},
+                            },
+                        }
+                        --//setting variables
+                        if (settings.limit_distance) then
+                            settings.checks.distance_limit = Options.silent_distance_limit.Value
+                        end
+                        --//getting all body parts
+                        for part1, part in next, Options.silent_aimpart.Value do
+                            local position = head.Position
+                            if (part == 'neck' or part1 == 'neck') then
+                                position = head.Position + vector3_new(0, -0.45, 0)
+                            elseif (part  == 'uppertorso' or part1  == 'uppertorso') then
+                                position = model.UpperTorso.Position + vector3_new(0, 0.2, 0)
+                            elseif (part  == 'lowertorso' or part1  == 'uppertorso') then
+                                position = model.LowerTorso.Position + vector3_new(0, 0.2, 0)
+                            end
+                            settings.checks.hitboxes[part] = {
+                                position = position,
+                                visible = true,
+                                vector2_distance = nil,
+                                distance = nil,
+                            }
+                        end
+                        --//checking if body parts are within fov and smaller than current closest
+                        do
+                            local replicated = {}
+                            for part, hitbox in next, settings.checks.hitboxes do
+                                local vector2, on_screen = functions:worldtoviewport(hitbox.position)
+                                local distance_vector2 = functions:calculate_magnitude(mouse_position, vector2)
+                                local distance = functions:calculate_magnitude(hitbox.position, camera.CFrame.Position)
+                                if (on_screen and (distance_vector2 < settings.fov_distance and distance_vector2 < stored.silent_aim.distance) and (distance < settings.checks.distance_limit)) then
+                                    replicated[part] = {
+                                        position = hitbox.position,
+                                        vector2 = vector2,
+                                        visible = true,
+                                        vector2_distance = distance_vector2,
+                                        distance = distance,
+                                    }
+                                end
+                            end
+                            settings.checks.hitboxes = replicated
+                        end
+                        --//checking visible
+                        for _, hitbox in next, settings.checks.hitboxes do
+                            if (hitbox.vector2_distance < stored.silent_aim.distance) then
+                                if (settings.visible_check) then
+                                    hitbox.visibe = false
+                                    if (functions:is_visible(hitbox.position, model)) then
+                                        hitbox.visibe = true
+                                        stored.silent_aim.player = model
+                                        stored.silent_aim.vector2 = hitbox.vector2
+                                        stored.silent_aim.vector3 = hitbox.position
+                                        stored.silent_aim.distance = hitbox.vector2_distance
+                                    end
+                                else
+                                    stored.silent_aim.player = model
+                                    stored.silent_aim.vector2 = hitbox.vector2
+                                    stored.silent_aim.vector3 = hitbox.position
+                                    stored.silent_aim.distance = hitbox.vector2_distance
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        if (Toggles.silent_targetsleepers.Value) then
+            for _, model in next, framework.variables.sleepers:GetChildren() do
+                local head = model:FindFirstChild('Head')
+                if (head and model.Humanoid.Health > 0) then
+                    if (Toggles.silent_toggle.Value) then
+                        local settings = {
+                            visible_check = Toggles.silent_visible_check.Value,
+                            limit_distance = Toggles.silent_limit_distance.Value,
+                            fov_distance = framework.drawings.silent_fov_circle.Radius,
+                            checks = {
+                                within_fov = false,
+                                distance_limit = math_huge,
+                                hitboxes = {},
+                                vector2_distance = {},
+                            },
+                        }
+                        --//setting variables
+                        if (settings.limit_distance) then
+                            settings.checks.distance_limit = Options.silent_distance_limit.Value
+                        end
+                        --//getting all body parts
+                        for part1, part in next, Options.silent_aimpart.Value do
+                            local position = head.Position
+                            if (part == 'neck' or part1 == 'neck') then
+                                position = head.Position + vector3_new(0, -0.45, 0)
+                            elseif (part  == 'uppertorso' or part1  == 'uppertorso') then
+                                position = model.UpperTorso.Position + vector3_new(0, 0.2, 0)
+                            elseif (part  == 'lowertorso' or part1  == 'uppertorso') then
+                                position = model.LowerTorso.Position + vector3_new(0, 0.2, 0)
+                            end
+                            settings.checks.hitboxes[part] = {
+                                position = position,
+                                visible = true,
+                                vector2_distance = nil,
+                                distance = nil,
+                            }
+                        end
+                        --//checking if body parts are within fov and smaller than current closest
+                        do
+                            local replicated = {}
+                            for part, hitbox in next, settings.checks.hitboxes do
+                                local vector2, on_screen = functions:worldtoviewport(hitbox.position)
+                                local distance_vector2 = functions:calculate_magnitude(mouse_position, vector2)
+                                local distance = functions:calculate_magnitude(hitbox.position, camera.CFrame.Position)
+                                if (on_screen and (distance_vector2 < settings.fov_distance and distance_vector2 < stored.silent_aim.distance) and (distance < settings.checks.distance_limit)) then
+                                    replicated[part] = {
+                                        position = hitbox.position,
+                                        vector2 = vector2,
+                                        visible = true,
+                                        vector2_distance = distance_vector2,
+                                        distance = distance,
+                                    }
+                                end
+                            end
+                            settings.checks.hitboxes = replicated
+                        end
+                        --//checking visible
+                        for _, hitbox in next, settings.checks.hitboxes do
+                            if (hitbox.vector2_distance < stored.silent_aim.distance) then
+                                if (settings.visible_check) then
+                                    hitbox.visibe = false
+                                    if (functions:is_visible(hitbox.position, model)) then
+                                        hitbox.visibe = true
+                                        stored.silent_aim.player = model
+                                        stored.silent_aim.vector2 = hitbox.vector2
+                                        stored.silent_aim.vector3 = hitbox.position
+                                        stored.silent_aim.distance = hitbox.vector2_distance
+                                    end
+                                else
+                                    stored.silent_aim.player = model
+                                    stored.silent_aim.vector2 = hitbox.vector2
+                                    stored.silent_aim.vector3 = hitbox.position
+                                    stored.silent_aim.distance = hitbox.vector2_distance
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        if (Toggles.silent_targetadmins.Value) then
+            for _, player in next, players:GetChildren() do
+                if (player ~= local_player) then
+                    local model = player.Character
+                    if (model and model.Parent ~= framework.variables.players) then
+                        local head = model:FindFirstChild('Head')
+                        if (head and model.Humanoid.Health > 0) then
+                            if (Toggles.silent_toggle.Value) then
+                                local settings = {
+                                    visible_check = Toggles.silent_visible_check.Value,
+                                    limit_distance = Toggles.silent_limit_distance.Value,
+                                    fov_distance = framework.drawings.silent_fov_circle.Radius,
+                                    checks = {
+                                        within_fov = false,
+                                        distance_limit = math_huge,
+                                        hitboxes = {},
+                                        vector2_distance = {},
+                                    },
+                                }
+                                --//setting variables
+                                if (settings.limit_distance) then
+                                    settings.checks.distance_limit = Options.silent_distance_limit.Value
+                                end
+                                --//getting all body parts
+                                for part1, part in next, Options.silent_aimpart.Value do
+                                    local position = head.Position
+                                    if (part == 'neck' or part1 == 'neck') then
+                                        position = head.Position + vector3_new(0, -0.45, 0)
+                                    elseif (part  == 'uppertorso' or part1  == 'uppertorso') then
+                                        position = model.UpperTorso.Position + vector3_new(0, 0.2, 0)
+                                    elseif (part  == 'lowertorso' or part1  == 'uppertorso') then
+                                        position = model.LowerTorso.Position + vector3_new(0, 0.2, 0)
+                                    end
+                                    settings.checks.hitboxes[part] = {
+                                        position = position,
+                                        visible = true,
+                                        vector2_distance = nil,
+                                        distance = nil,
+                                    }
+                                end
+                                --//checking if body parts are within fov and smaller than current closest
+                                do
+                                    local replicated = {}
+                                    for part, hitbox in next, settings.checks.hitboxes do
+                                        local vector2, on_screen = functions:worldtoviewport(hitbox.position)
+                                        local distance_vector2 = functions:calculate_magnitude(mouse_position, vector2)
+                                        local distance = functions:calculate_magnitude(hitbox.position, camera.CFrame.Position)
+                                        if (on_screen and (distance_vector2 < settings.fov_distance and distance_vector2 < stored.silent_aim.distance) and (distance < settings.checks.distance_limit)) then
+                                            replicated[part] = {
+                                                position = hitbox.position,
+                                                vector2 = vector2,
+                                                visible = true,
+                                                vector2_distance = distance_vector2,
+                                                distance = distance,
+                                            }
+                                        end
+                                    end
+                                    settings.checks.hitboxes = replicated
+                                end
+                                --//checking visible
+                                for _, hitbox in next, settings.checks.hitboxes do
+                                    if (hitbox.vector2_distance < stored.silent_aim.distance) then
+                                        if (settings.visible_check) then
+                                            hitbox.visibe = false
+                                            if (functions:is_visible(hitbox.position, model)) then
+                                                hitbox.visibe = true
+                                                stored.silent_aim.player = model
+                                                stored.silent_aim.vector2 = hitbox.vector2
+                                                stored.silent_aim.vector3 = hitbox.position
+                                                stored.silent_aim.distance = hitbox.vector2_distance
+                                            end
+                                        else
+                                            stored.silent_aim.player = model
+                                            stored.silent_aim.vector2 = hitbox.vector2
+                                            stored.silent_aim.vector3 = hitbox.position
+                                            stored.silent_aim.distance = hitbox.vector2_distance
+                                        end
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return stored.silent_aim
+    end
+    function framework:position_getclosest(max_distance)
+        max_distance = max_distance or math_huge
+        local stored = {
+            distance = max_distance,
+        }
+        local mouse_position = framework.settings.mouse_position
+        for _, model in next, framework.variables.players:GetChildren() do
+            if (model ~= local_player.Character) then
+                local head = model:FindFirstChild('Head')
+                if (head and model.Humanoid.Health > 0) then
+                    local distance = functions:calculate_magnitude(model.Head.Position)
+                    if (distance < stored.distance) then
+                        stored = {
+                            distance = distance,
+                            player = model,
+                            hitbox = head,
+                            vector3 = head.Position,
+                        }
+                    end
+                end
+            end
+        end
+        if (Toggles.killaura_targetsleepers.Value) then
+            for _, model in next, framework.variables.sleepers:GetChildren() do
+                local head = model:FindFirstChild('Head')
+                if (head and model.Humanoid.Health > 0) then
+                    local distance = functions:calculate_magnitude(model.Head.Position)
+                    if (distance < stored.distance) then
+                        stored = {
+                            distance = distance,
+                            player = model,
+                            hitbox = head,
+                            vector3 = head.Position,
+                        }
+                    end
+                end
+            end
+        end
+        if (Toggles.killaura_targetadmins.Value) then
+            for _, player in next, players:GetChildren() do
+                if (player ~= local_player) then
+                    local model = player.Character
+                    if (model and model.Parent ~= framework.variables.players) then
+                        local head = model:FindFirstChild('Head')
+                        if (head and model.Humanoid.Health > 0) then
+                            local distance = functions:calculate_magnitude(model.Head.Position)
+                            if (distance < stored.distance) then
+                                stored = {
+                                    distance = distance,
+                                    player = model,
+                                    hitbox = head,
+                                    vector3 = head.Position,
+                                }
+                            end
+                        end
+                    end
+                end
+            end
+        end
+        return stored
+    end
+    function framework:checkPart(classname)
+        if (classname == 'Part' or classname == 'MeshPart' or classname == 'UnionOperation') then
+            return true
+        end
+    end
+    function framework:chamModel(model, material, colour, children)
+        local _table
+        if (children) then
+            _table = model:GetChildren()
+        else
+            _table = model:GetDescendants()
+        end
+        local old = {}
+        for _, part in _table do
+            if (framework:checkPart(part.ClassName)) then
+                table_insert(old, {
+                    ['part'] = part,
+                    ['material'] = part.Material,
+                    ['colour'] = part.Color,
+                })
+                part.Material = Enum.Material[material]
+                part.Color = colour
+            end
+        end
+        return old
+    end
+    function framework:is_awake(model)
+        if (model.Parent == framework.variables.players) then
+            return true
+        end
+        return false
+    end
+    function framework:getheld(model)
+        local target_tool = 'None'
+        local worldmodel = model:FindFirstChild('Worldmodel')
+        if (worldmodel) then
+            local target_children = {}
+            local oldTarget_children = worldmodel:GetChildren()
+            for _, mesh in next, oldTarget_children do
+                if (mesh:IsA('MeshPart')) then
+                    table_insert(target_children, mesh)
+                end
+            end
+            for _, tool in next, framework.variables.tools:GetChildren() do
+                local tool_worldmodel = tool:FindFirstChild('Worldmodel')
+                if (tool_worldmodel) then
+                    local tool_children = tool_worldmodel:GetChildren()
+
+                    for index, mesh in next, tool_children do
+                        if (mesh and mesh:IsA('MeshPart') and target_children[index] and mesh.MeshId == target_children[index].MeshId) then
+                            return tool.Name
+                        end
+                    end
+
+                end
+            end
+
+        end
+        return target_tool
+    end
+    function framework:add_sleeper(model)
+        -- creating esp
+        local esp_drawings = {
+            text = {
+                weapon = drawing_new('Text'),
+                distance = drawing_new('Text'),
+                name = drawing_new('Text'),
+            },
+            corner_box = {
+                line1 = drawing_new('Line'),
+                line2 = drawing_new('Line'),
+                line3 = drawing_new('Line'),
+                line4 = drawing_new('Line'),
+                line5 = drawing_new('Line'),
+                line6 = drawing_new('Line'),
+                line7 = drawing_new('Line'),
+                line8 = drawing_new('Line'),
+            },
+            box = {
+                outline_box = drawing_new('Quad'),
+                box = drawing_new('Quad'),
+            },
+        }
+        -- setting drawing values
+        do
+            for _, drawings in next, esp_drawings do
+                for _, drawing in next, drawings do
+                    drawing.ZIndex = 3
+                    drawing.Visible = false
+                end
+            end
+            for _, drawing in next, esp_drawings.text do
+                drawing.Center = true
+            end
+            esp_drawings.box.outline_box.Color = colour3_new(0, 0, 0)
+            esp_drawings.box.outline_box.Thickness = 1.7
+            esp_drawings.box.box.Thickness = 0.85
+            esp_drawings.box.box.ZIndex = 11
+        end
+        -- functions
+        local function hide_drawings()
+            for _, value in next, esp_drawings do
+                for _, drawing in next, value do
+                    drawing.Visible = false
+                end
+            end
+        end
+        local function box_esp(offset, vector2, boxtype, colour, outline)
+            local box_points = {
+                PointA = vector2_new(vector2.X + offset.X, vector2.Y + offset.Y),
+                PointB = vector2_new(vector2.X + offset.X, vector2.Y - offset.Y),
+                PointC = vector2_new(vector2.X - offset.X, vector2.Y - offset.Y),
+                PointD = vector2_new(vector2.X - offset.X, vector2.Y + offset.Y),
+            }
+            if (boxtype == 'full') then
+                -- hiding corner box
+                for _, drawing in next, esp_drawings.corner_box do
+                    drawing.Visible = false
+                end
+                -- settings points
+                for point, position in next, box_points do
+                    esp_drawings.box.box[point] = position
+                    if (outline) then
+                        esp_drawings.box.outline_box[point] = position 
+                        esp_drawings.box.outline_box.Visible = true
+                    end
+                end
+                -- settings variables
+                esp_drawings.box.box.Color = colour
+                esp_drawings.box.box.Visible = true
+                -- check outline
+                do
+                    if (outline) then
+                        esp_drawings.box.outline_box.Visible = true
+                    else
+                        esp_drawings.box.outline_box.Visible = false
+                    end
+                end
+            else
+                -- hiding full box
+                do
+                    esp_drawings.box.outline_box.Visible = false
+                    esp_drawings.box.box.Visible = false
+                end
+                -- settings colours
+                for _, drawing in next, esp_drawings.corner_box do
+                    drawing.Visible = true
+                    drawing.Color = colour
+                end
+                -- setting position
+                do
+                    esp_drawings.corner_box.line1.To = box_points.PointA
+                    esp_drawings.corner_box.line1.From = vector2_new(vector2.X + offset.X, vector2.Y + offset.Y / 1.7)
+                    esp_drawings.corner_box.line5.To = box_points.PointA
+                    esp_drawings.corner_box.line5.From = vector2_new(vector2.X + offset.X / 1.7, vector2.Y + offset.Y)
+                    esp_drawings.corner_box.line2.To =  box_points.PointB
+                    esp_drawings.corner_box.line2.From = vector2_new(vector2.X+ offset.X, vector2.Y - offset.Y / 1.7)
+                    esp_drawings.corner_box.line6.To = box_points.PointB
+                    esp_drawings.corner_box.line6.From = vector2_new(vector2.X + offset.X / 1.7, vector2.Y - offset.Y)
+                    esp_drawings.corner_box.line3.To = box_points.PointC
+                    esp_drawings.corner_box.line3.From = vector2_new(vector2.X - offset.X, vector2.Y - offset.Y / 1.7)
+                    esp_drawings.corner_box.line7.To = box_points.PointC
+                    esp_drawings.corner_box.line7.From = vector2_new(vector2.X - offset.X / 1.7, vector2.Y - offset.Y)
+                    esp_drawings.corner_box.line4.To =  box_points.PointD
+                    esp_drawings.corner_box.line4.From = vector2_new(vector2.X - offset.X, vector2.Y + offset.Y / 1.7)
+                    esp_drawings.corner_box.line8.To = box_points.PointD
+                    esp_drawings.corner_box.line8.From = vector2_new(vector2.X - offset.X / 1.7, vector2.Y + offset.Y)
+                end
+            end
+        end
+        local function distance_esp(offset, vector2, colour, distance)
+            esp_drawings.text.distance.Visible = true
+            esp_drawings.text.distance.Color = colour
+            esp_drawings.text.distance.Text = '[' .. tost(distance) .. ']'
+            esp_drawings.text.distance.Position = vector2_new(vector2.X, vector2.Y + offset.Y + 1)
+        end
+        local function name_esp(offset, vector2, colour)
+            esp_drawings.text.name.Text = model.Name
+            esp_drawings.text.name.Visible = true
+            esp_drawings.text.name.Color = colour
+            esp_drawings.text.name.Position = vector2_new(vector2.X, vector2.Y - offset.Y - 15)
+        end
+        local connection; connection = runservice.Heartbeat:Connect(function()
+            if (model.Parent ~= framework.variables.sleepers) then
+                for _, esp in next, esp_drawings do
+                    for _, drawing in next, esp do
+                        drawing:Remove()
+                    end
+                end
+                connection:Disconnect()
+                return
+            end
+            local uppertorso = model:FindFirstChild('UpperTorso')
+            if (not (uppertorso and model.Humanoid.Health > 0)) then
+                hide_drawings()
+                return
+            end
+            local info = {
+                position = uppertorso.Position,
+                vector2_pos = nil,
+                on_screen = nil,
+                is_awake = framework:is_awake(model),
+                distance = functions:calculate_magnitude(uppertorso.Position),
+                box = {},
+            }
+            info.vector2_pos, info.on_screen = functions:worldtoviewport(info.position)
+            if (info.on_screen and Toggles.sleeperesp_toggle.Value) then
+                info.box.orientation, info.box.size = model:GetBoundingBox()
+                -- getting screen position
+                local custom_cframe = cframe_new(info.position, camera.CFrame.Position)
+                -- player
+                if (Toggles.sleeperesp_toggle.Value and (not Toggles.sleeperesp_limit_distance.Value or Options.sleeperesp_distance_limit.Value > info.distance)) then
+                    local top_right = functions:worldtoviewport((custom_cframe * cframe_new(-info.box.size.X / 2, info.box.size.Y / 2, 0)).Position)
+                    local bottom_right = functions:worldtoviewport((custom_cframe * cframe_new(-info.box.size.X / 2, -info.box.size.Y / 2, 0)).Position)
+                    info.offset = vector2_new(math_max(top_right.X - info.vector2_pos.X, bottom_right.X - info.vector2_pos.X), math_max((info.vector2_pos.Y - top_right.Y), (bottom_right.Y - info.vector2_pos.Y)) + 1)
+                    -- box esp
+                    do
+                        if (Toggles.sleeperesp_box.Value) then
+                            local colour = Options.sleeperesp_box_colour.Value
+                            box_esp(info.offset, info.vector2_pos, Options.sleeperesp_boxtype.Value, colour, Toggles.sleeperesp_boxoutline.Value)
+                        else
+                            for _, drawing in next, esp_drawings.corner_box do
+                                drawing.Visible = false
+                            end
+                            esp_drawings.box.outline_box.Visible = false
+                            esp_drawings.box.box.Visible = false
+                        end
+                    end
+                    -- distance esp
+                    do
+                        if (Toggles.sleeperesp_distance.Value) then
+                            local colour = Options.sleeperesp_distance_colour.Value
+                            distance_esp(info.offset, info.vector2_pos, colour, functions:calculate_magnitude(info.position))
+                        else
+                            esp_drawings.text.distance.Visible = false
+                        end
+                    end
+                    -- name esp
+                    do
+                        if (Toggles.sleeperesp_name.Value) then
+                            local colour = Options.sleeperesp_name_colour.Value
+                            name_esp(info.offset, info.vector2_pos, colour)
+                        else
+                            esp_drawings.text.name.Visible = false
+                        end
+                    end
+                    for _, drawing in next, esp_drawings.text do
+                        drawing.Size = Options.sleeperesp_textsize.Value
+                        drawing.Font = framework.esp.fonts[Options.sleeperesp_font.Value]
+                        drawing.Outline = Toggles.sleeperesp_textoutline.Value
+                    end
+                    return
+                else
+                    hide_drawings()
+                    return
+                end
+            else
+                hide_drawings()
+                return
+            end
+            return
+        end)
+        table_insert(uninject_table.connections, connection)
+    end
+    function framework:add_player(player)
+        local model
+        if (player == local_player) then
+            return
+        end
+        -- creating esp
+        local esp_drawings = {
+            text = {
+                weapon = drawing_new('Text'),
+                distance = drawing_new('Text'),
+                name = drawing_new('Text'),
+                tool = drawing_new('Text'),
+            },
+            corner_box = {
+                line1 = drawing_new('Line'),
+                line2 = drawing_new('Line'),
+                line3 = drawing_new('Line'),
+                line4 = drawing_new('Line'),
+                line5 = drawing_new('Line'),
+                line6 = drawing_new('Line'),
+                line7 = drawing_new('Line'),
+                line8 = drawing_new('Line'),
+            },
+            box = {
+                outline_box = drawing_new('Quad'),
+                box = drawing_new('Quad'),
+            },
+            healthbar = {
+                base = drawing_new('Square'),
+                health = drawing_new('Square'),
+            },
+        }
+        -- setting drawing values
+        do
+            for _, drawings in next, esp_drawings do
+                for _, drawing in next, drawings do
+                    drawing.ZIndex = 3
+                    drawing.Visible = false
+                    table_insert(uninject_table.drawings, drawing)
+                end
+            end
+            for _, drawing in next, esp_drawings.text do
+                drawing.Center = true
+            end
+            local box = esp_drawings.box
+            box.outline_box.Color = colour3_new(0, 0, 0)
+            box.outline_box.Thickness = 1.7
+            box.box.Thickness = 0.85
+            box.box.ZIndex = 11
+            local healthbar = esp_drawings.healthbar
+            healthbar.base.Color = colour3_fromrgb(90, 90, 90)
+            healthbar.base.Filled = true
+            healthbar.health.ZIndex = 11
+        end
+        -- functions
+        local function hide_drawings()
+            for _, value in next, esp_drawings do
+                for _, drawing in next, value do
+                    drawing.Visible = false
+                end
+            end
+        end
+        local function box_esp(offset, vector2, boxtype, colour, outline)
+            local box_points = {
+                PointA = vector2_new(vector2.X + offset.X, vector2.Y + offset.Y),
+                PointB = vector2_new(vector2.X + offset.X, vector2.Y - offset.Y),
+                PointC = vector2_new(vector2.X - offset.X, vector2.Y - offset.Y),
+                PointD = vector2_new(vector2.X - offset.X, vector2.Y + offset.Y),
+            }
+            if (boxtype == 'full') then
+                -- hiding corner box
+                for _, drawing in next, esp_drawings.corner_box do
+                    drawing.Visible = false
+                end
+                -- settings points
+                for point, position in next, box_points do
+                    esp_drawings.box.box[point] = position
+                    if (outline) then
+                        esp_drawings.box.outline_box[point] = position 
+                        esp_drawings.box.outline_box.Visible = true
+                    end
+                end
+                -- settings variables
+                esp_drawings.box.box.Color = colour
+                esp_drawings.box.box.Visible = true
+                -- check outline
+                do
+                    if (outline) then
+                        esp_drawings.box.outline_box.Visible = true
+                    else
+                        esp_drawings.box.outline_box.Visible = false
+                    end
+                end
+            else
+                -- hiding full box
+                do
+                    esp_drawings.box.outline_box.Visible = false
+                    esp_drawings.box.box.Visible = false
+                end
+                -- settings colours
+                for _, drawing in next, esp_drawings.corner_box do
+                    drawing.Visible = true
+                    drawing.Color = colour
+                end
+                -- setting position
+                do
+                    esp_drawings.corner_box.line1.To = box_points.PointA
+                    esp_drawings.corner_box.line1.From = vector2_new(vector2.X + offset.X, vector2.Y + offset.Y / 1.7)
+                    esp_drawings.corner_box.line5.To = box_points.PointA
+                    esp_drawings.corner_box.line5.From = vector2_new(vector2.X + offset.X / 1.7, vector2.Y + offset.Y)
+                    esp_drawings.corner_box.line2.To =  box_points.PointB
+                    esp_drawings.corner_box.line2.From = vector2_new(vector2.X+ offset.X, vector2.Y - offset.Y / 1.7)
+                    esp_drawings.corner_box.line6.To = box_points.PointB
+                    esp_drawings.corner_box.line6.From = vector2_new(vector2.X + offset.X / 1.7, vector2.Y - offset.Y)
+                    esp_drawings.corner_box.line3.To = box_points.PointC
+                    esp_drawings.corner_box.line3.From = vector2_new(vector2.X - offset.X, vector2.Y - offset.Y / 1.7)
+                    esp_drawings.corner_box.line7.To = box_points.PointC
+                    esp_drawings.corner_box.line7.From = vector2_new(vector2.X - offset.X / 1.7, vector2.Y - offset.Y)
+                    esp_drawings.corner_box.line4.To =  box_points.PointD
+                    esp_drawings.corner_box.line4.From = vector2_new(vector2.X - offset.X, vector2.Y + offset.Y / 1.7)
+                    esp_drawings.corner_box.line8.To = box_points.PointD
+                    esp_drawings.corner_box.line8.From = vector2_new(vector2.X - offset.X / 1.7, vector2.Y + offset.Y)
+                end
+            end
+        end
+        local function distance_esp(offset, vector2, colour, distance, weapon_toggle)
+            local addtional_offset = 1
+			if (weapon_toggle) then
+				addtional_offset = 13
+			end
+            local distance_dr = esp_drawings.text.distance
+            distance_dr.Visible = true
+            distance_dr.Color = colour
+            distance_dr.Text = '[' .. tost(distance) .. ']'
+            distance_dr.Position = vector2_new(vector2.X, vector2.Y + offset.Y + addtional_offset)
+        end
+        local function name_esp(offset, vector2, colour)
+            local name_dr = esp_drawings.text.name
+            name_dr.Text = model.Name
+            name_dr.Visible = true
+            name_dr.Color = colour
+            name_dr.Position = vector2_new(vector2.X, vector2.Y - offset.Y - 15)
+        end
+        local function tool_esp(offset, vector2, colour)
+            local tool_dr = esp_drawings.text.tool
+            local a = framework:getheld(model)
+            tool_dr.Text = a
+            tool_dr.Visible = true
+            tool_dr.Color = colour
+            tool_dr.Position = vector2_new(vector2.X, vector2.Y + offset.Y + 1)
+        end
+        local function healthbar_esp(offset, vector2, colour, pos)
+            local base_dr = esp_drawings.healthbar.base
+            local health_dr =  esp_drawings.healthbar.health
+            base_dr.Visible = true
+            health_dr.Visible = true
+            local base_y = offset.Y * 2
+            local base_pos, healthpos
+            if (pos == 'left') then
+                base_pos = vector2_new(vector2.X - offset.X - 6, vector2.Y - offset.Y)
+            else
+                base_pos = vector2_new(vector2.X + offset.X + 3, vector2.Y - offset.Y)
+            end
+            base_dr.Position = base_pos
+            base_dr.Size = vector2_new(3, base_y)
+            local hum = model.Humanoid
+            health_dr.Size = vector2_new(2, (base_y - 2) * (hum.Health / hum.MaxHealth))
+            health_dr.Color = colour
+            health_dr.Position = base_pos + vector2_new(0.5, base_y - 0.5 - health_dr.Size.Y)
+        end
+        local connection; connection = runservice.Heartbeat:Connect(function()
+            if (not player) then
+                for _, esp in next, esp_drawings do
+                    for _, drawing in next, esp do
+                        drawing:Remove()
+                    end
+                end
+                connection:Disconnect()
+                return
+            end
+            model = player.Character
+            if (not model) then
+                hide_drawings()
+                return
+            end
+            local uppertorso = model:FindFirstChild('UpperTorso')
+            if (not (uppertorso and model.Humanoid.Health > 0)) then
+                hide_drawings()
+                return
+            end
+            local info = {
+                position = uppertorso.Position,
+                vector2_pos = nil,
+                on_screen = nil,
+                silent_targeted = false,
+                aimbot_targeted = false,
+                is_awake = framework:is_awake(model),
+                distance = functions:calculate_magnitude(uppertorso.Position),
+                box = {},
+            }
+            info.vector2_pos, info.on_screen = functions:worldtoviewport(info.position)
+            if (info.on_screen and (Toggles.playeresp_toggle.Value or Toggles.sleeperesp_toggle.Value or Toggles.adminesp_toggle.Value)) then
+                info.box.orientation, info.box.size = model:GetBoundingBox()
+                -- checking targeted
+                do
+                    if (Toggles.silent_highlight_target.Value and framework.target.silent.player == model) then
+                        info.silent_targeted = true
+                    end
+                end
+                -- getting screen position
+                local custom_cframe = cframe_new(info.position, camera.CFrame.Position)
+                -- player
+                if (info.is_awake and Toggles.playeresp_toggle.Value and (not Toggles.playeresp_limit_distance.Value or Options.playeresp_distance_limit.Value > info.distance)) then
+                    local top_right = functions:worldtoviewport((custom_cframe * cframe_new(-info.box.size.X / 2, info.box.size.Y / 2, 0)).Position)
+                    local bottom_right = functions:worldtoviewport((custom_cframe * cframe_new(-info.box.size.X / 2, -info.box.size.Y / 2, 0)).Position)
+                    info.offset = vector2_new(math_max(top_right.X - info.vector2_pos.X, bottom_right.X - info.vector2_pos.X), math_max((info.vector2_pos.Y - top_right.Y), (bottom_right.Y - info.vector2_pos.Y)) + 1)
+                    -- box esp
+                    do
+                        if (Toggles.playeresp_box.Value) then
+                            local colour = Options.playeresp_box_colour.Value
+                            if (info.silent_targeted) then
+                                colour = Options.silent_highlight_colour.Value
+                            end
+                            box_esp(info.offset, info.vector2_pos, Options.playeresp_boxtype.Value, colour, Toggles.playeresp_boxoutline.Value)
+                        else
+                            for _, drawing in next, esp_drawings.corner_box do
+                                drawing.Visible = false
+                            end
+                            esp_drawings.box.outline_box.Visible = false
+                            esp_drawings.box.box.Visible = false
+                        end
+                    end
+                    -- distance esp
+                    do
+                        if (Toggles.playeresp_distance.Value) then
+                            local colour = Options.playeresp_distance_colour.Value
+                            if (info.silent_targeted) then
+                                colour = Options.silent_highlight_colour.Value
+                            end
+                            distance_esp(info.offset, info.vector2_pos, colour, functions:calculate_magnitude(info.position), Toggles.playeresp_weapon.Value)
+                        else
+                            esp_drawings.text.distance.Visible = false
+                        end
+                    end
+                    -- tool esp
+                    do
+                        if (Toggles.playeresp_weapon.Value) then
+                            local colour = Options.playeresp_weapon_colour.Value
+                            if (info.silent_targeted) then
+                                colour = Options.silent_highlight_colour.Value
+                            end
+                            tool_esp(info.offset, info.vector2_pos, colour)
+                        else
+                            esp_drawings.text.tool.Visible = false
+                        end
+                    end
+                    -- name esp
+                    do
+                        if (Toggles.playeresp_name.Value) then
+                            local colour = Options.playeresp_name_colour.Value
+                            if (info.silent_targeted) then
+                                colour = Options.silent_highlight_colour.Value
+                            end
+                            name_esp(info.offset, info.vector2_pos, colour)
+                        else
+                            esp_drawings.text.name.Visible = false
+                        end
+                    end
+                    -- healthbar esp
+                    do
+                        if (Toggles.playeresp_healthbar.Value) then
+                            healthbar_esp(info.offset, info.vector2_pos, Options.playeresp_healthbar_colour.Value, Options.playeresp_healthbarpos.Value)
+                        else
+                            esp_drawings.healthbar.base.Visible = false
+                            esp_drawings.healthbar.health.Visible = false
+                        end
+                    end
+                    for _, drawing in next, esp_drawings.text do
+                        drawing.Size = Options.playeresp_textsize.Value
+                        drawing.Font = framework.esp.fonts[Options.playeresp_font.Value]
+                        drawing.Outline = Toggles.playeresp_textoutline.Value
+                    end
+                    return
+                elseif (not info.is_awake and Toggles.adminesp_toggle.Value and (not Toggles.adminesp_limit_distance.Value or Options.adminesp_distance_limit.Value > info.distance)) then
+                    local top_right = functions:worldtoviewport((custom_cframe * cframe_new(-info.box.size.X / 2, info.box.size.Y / 2, 0)).Position)
+                    local bottom_right = functions:worldtoviewport((custom_cframe * cframe_new(-info.box.size.X / 2, -info.box.size.Y / 2, 0)).Position)
+                    info.offset = vector2_new(math_max(top_right.X - info.vector2_pos.X, bottom_right.X - info.vector2_pos.X), math_max((info.vector2_pos.Y - top_right.Y), (bottom_right.Y - info.vector2_pos.Y)) + 1)
+                    -- box esp
+                    do
+                        if (Toggles.adminesp_box.Value) then
+                            local colour = Options.adminesp_box_colour.Value
+                            if (info.silent_targeted) then
+                                colour = Options.silent_highlight_colour.Value
+                            end
+                            box_esp(info.offset, info.vector2_pos, Options.adminesp_boxtype.Value, colour, Toggles.adminesp_boxoutline.Value)
+                        else
+                            for _, drawing in next, esp_drawings.corner_box do
+                                drawing.Visible = false
+                            end
+                            esp_drawings.box.outline_box.Visible = false
+                            esp_drawings.box.box.Visible = false
+                        end
+                    end
+                    -- distance esp
+                    do
+                        if (Toggles.adminesp_distance.Value) then
+                            local colour = Options.adminesp_distance_colour.Value
+                            if (info.silent_targeted) then
+                                colour = Options.silent_highlight_colour.Value
+                            end
+                            distance_esp(info.offset, info.vector2_pos, colour, functions:calculate_magnitude(info.position))
+                        else
+                            esp_drawings.text.distance.Visible = false
+                        end
+                    end
+                    -- name esp
+                    do
+                        if (Toggles.adminesp_name.Value) then
+                            local colour = Options.adminesp_name_colour.Value
+                            if (info.silent_targeted) then
+                                colour = Options.silent_highlight_colour.Value
+                            end
+                            name_esp(info.offset, info.vector2_pos, colour)
+                        else
+                            esp_drawings.text.name.Visible = false
+                        end
+                    end
+                    -- healthbar esp
+                    do
+                        if (Toggles.adminesp_healthbar.Value) then
+                            local colour = Options.adminesp_name_colour.Value
+                            if (info.silent_targeted) then
+                                colour = Options.silent_highlight_colour.Value
+                            end
+                            healthbar_esp(info.offset, info.vector2_pos, colour, Options.adminesp_healthbarpos.Value)
+                        else
+                            esp_drawings.healthbar.base.Visible = false
+                            esp_drawings.healthbar.health.Visible = false
+                        end
+                    end
+                    for _, drawing in next, esp_drawings.text do
+                        drawing.Size = Options.adminesp_textsize.Value
+                        drawing.Font = framework.esp.fonts[Options.adminesp_font.Value]
+                        drawing.Outline = Toggles.adminesp_textoutline.Value
+                    end
+                    return
+                else
+                    hide_drawings()
+                    return
+                end
+            else
+                hide_drawings()
+                return
+            end
+            return
+        end)
+        table_insert(uninject_table.connections, connection)
+    end
+    function framework:get_ignorelist()
+        local ignorelist = {
+            camera,
+            local_player.Character,
+            framework.variables.ignored,
+        }
+        for _, instance in next, workspace:GetChildren() do
+            if (instance ~= framework.variables.players and instance ~= framework.variables.ignored and instance ~= local_player.Character and instance ~= camera) then
+                table_insert(ignorelist, instance)
+            end
+        end
+        return ignorelist
+    end
+    function framework.loop_function(delta_time)
+        framework.settings.killaura_onCooldown += delta_time
+
+        framework.settings.mouse_position = userinputservice:GetMouseLocation()
+        framework.drawings.silent_fov_circle.Position = framework.settings.mouse_position
+        --fieldofview
+        do
+            if (Toggles.zoom_toggle.Value and Options.zoom_key.Value ~= 'None' and Options.zoom_key:GetState()) then
+                camera.FieldOfView = Options.zoom_amount.Value
+            elseif (Toggles.fieldofview_toggle.Value) then
+                camera.FieldOfView = Options.fieldofview_amount.Value
+            end
+        end
+        -- fov size
+        do
+            local Sfov_size = Options.silent_fov_size.Value
+            if (Toggles.silent_dynamic_fov.Value) then
+                Sfov_size = Sfov_size / (camera.FieldOfView / 70)
+            end
+            framework.drawings.silent_fov_circle.Radius = Sfov_size
+        end
+        -- spam sound
+        if (Toggles.spamsound_toggle.Value) then
+            local sound = framework.sounds[Options.spamming_sound.Value]
+            if (not sound) then
+                sound = replicatedstorage.Assets.Sounds.Tools['Admin Gun'].Fire
+            end
+            framework.variables.remote_event:FireServer('Replicate Sound', false, sound)
+        end
+        -- needs character
+        local character = local_player.Character
+        if (character and character:FindFirstChild('HumanoidRootPart')) then
+            --killaura range circle
+            do
+                if (framework.settings.killaura_circle) then
+                    --thanks vape for math
+                    framework.target.killaura_rangecircle.CFrame = character.HumanoidRootPart.CFrame - vector3_new(0, character.Humanoid.HipHeight + (character.HumanoidRootPart.Size.Y / 2) - 0.3, 0)
+                end
+            end
+            -- walkspeed
+            if (Toggles.walkspeed_toggle.Value) then
+                local_player.Character.Humanoid.WalkSpeed = Options.walkspeed_slider.Value
+            end
+            -- getting silent aim target + killaura
+            do
+                if (Toggles.silent_toggle.Value) then
+                    local silent, aimbot = framework:mouse_getclosest()
+                    framework.target.silent = silent
+                    framework.target.aimbot = aimbot
+                end
+                if (Toggles.killaura.Value) then
+                    local killaura = framework:position_getclosest(Options.killaura_distance.Value)
+                    if (killaura.player and framework.settings.killaura_onCooldown >= Options.killaura_attackcooldown.Value) then
+                        framework.settings.killaura_onCooldown = 0
+                        framework.variables.remote_event:FireServer('Melee Hit', false, killaura.hitbox, camera.CFrame, Enum.Material.Plastic, 1, true, killaura.player)
+                    end
+                end
+            end
+        end
+        -- visual shit for aim
+        do
+            if (framework.target.silent.player) then
+                --snapline
+                if (Toggles.silent_snapline.Value) then
+                    framework.drawings.silent_snapline.Visible = true
+                    framework.drawings.silent_snapline.To = framework.target.silent.vector2
+                    framework.drawings.silent_snapline.From = framework.settings.mouse_position
+                else
+                    framework.drawings.silent_snapline.Visible = false
+                end
+            else
+                framework.drawings.silent_snapline.Visible = false
+            end
+        end
+    end
+end
+local tabs = {
+    combat = window:AddTab('combat'),
+    visuals = window:AddTab('visuals'),
+    _local = window:AddTab('local'),
+    world = window:AddTab('world'),
+    ui = window:AddTab('ui'),
+}
+local sections = {
+    combat = {
+        silent_aim = tabs.combat:AddLeftTabbox('silent aim'),
+        weapon_mods = tabs.combat:AddRightGroupbox('weapon modifications'),
+        killaura = tabs.combat:AddRightTabbox('killaura'),
+    },
+    visuals = {
+        player_esp = tabs.visuals:AddLeftTabbox('player esp', 1),
+        admin_esp = tabs.visuals:AddRightTabbox('admin esp', 1),
+        sleeper_esp = tabs.visuals:AddRightTabbox('sleeper esp', 1),
+    },
+    _local = {
+        walkspeed = tabs._local:AddLeftGroupbox('walkspeed'),
+        fieldofview = tabs._local:AddLeftGroupbox('field of view'),
+        zoom = tabs._local:AddLeftGroupbox('zoom'),
+        local_chams = tabs._local:AddRightGroupbox('local chams'),
+        misc = tabs._local:AddRightGroupbox('misc'),
+    },
+    world = {
+        misc = tabs.world:AddLeftGroupbox('misc'),
+        exploits = tabs.world:AddRightGroupbox('exploits'),
+    },
+    ui = {
+        ui_settings = tabs.ui:AddLeftGroupbox('ui settings', 1),
+    },
+}
+local subsections = {
+    combat = {
+        silent_aim = {
+            main = sections.combat.silent_aim:AddTab('silent aim'),
+            sub = sections.combat.silent_aim:AddTab('extra'),
+        },
+        killaura = {
+            main = sections.combat.killaura:AddTab('killaura'),
+            sub = sections.combat.killaura:AddTab('extra'),
+        },
+    },
+    visuals = {
+        player_esp = {
+            main = sections.visuals.player_esp:AddTab('player esp'),
+            sub = sections.visuals.player_esp:AddTab('settings'),
+        },
+        sleeper_esp = {
+            main = sections.visuals.sleeper_esp:AddTab('sleeper esp'),
+            sub = sections.visuals.sleeper_esp:AddTab('settings'),
+        },
+        admin_esp = {
+            main = sections.visuals.admin_esp:AddTab('admin esp'),
+            sub = sections.visuals.admin_esp:AddTab('settings'),
+        },
+    },
+}
+-- ui
+do
+    -- combat
+    do
+        -- silent_aim
+        do
+            subsections.combat.silent_aim.main:AddToggle('silent_toggle', {Text = 'enabled', Default = false})
+            subsections.combat.silent_aim.main:AddSlider('silent_hitchance', {Text = 'hitchance', Compact = true, Rounding = 0, Default = 100, Min = 0, Max = 100, Suffix = '%'})
+            subsections.combat.silent_aim.main:AddDropdown('silent_aimpart', {Text = 'aimpart', Default = 1, Values = {'head', 'neck', 'uppertorso', 'lowertorso'}, Multi = true})
+            subsections.combat.silent_aim.main:AddToggle('silent_visible_check', {Text = 'visible check', Default = false})
+            subsections.combat.silent_aim.main:AddToggle('silent_limit_distance', {Text = 'limit distance', Default = false})
+            subsections.combat.silent_aim.main:AddSlider('silent_distance_limit', {Text = 'distance', Compact = true, Rounding = 0, Default = 2000, Min = 0, Max = 2000, Suffix = ' studs'})
+            subsections.combat.silent_aim.main:AddToggle('silent_snapline', {Text = 'snapline', Default = false}):AddColorPicker('silent_snapline_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            subsections.combat.silent_aim.main:AddToggle('silent_highlight_target', {Text = 'highlight target', Default = false}):AddColorPicker('silent_highlight_colour', {Default = colour3_fromrgb(255, 0, 0)})
+            subsections.combat.silent_aim.main:AddToggle('silent_dynamic_fov', {Text = 'dynamic fov', Default = true})
+            subsections.combat.silent_aim.main:AddToggle('silent_draw_fov', {Text = 'draw fov', Default = false}):AddColorPicker('silent_fov_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            subsections.combat.silent_aim.main:AddSlider('silent_fov_size', {Text = 'fov size', Rounding = 0, Default = 150, Min = 0, Max = 1000, Suffix = 'px'})
+            -- subsection
+            do
+                subsections.combat.silent_aim.sub:AddToggle('silent_teamcheck', {Text = 'team check [WIP]', Default = true})
+                subsections.combat.silent_aim.sub:AddToggle('silent_downedcheck', {Text = 'downed check [WIP]', Default = true})
+                subsections.combat.silent_aim.sub:AddToggle('silent_targetsleepers', {Text = 'target sleepers', Default = false})
+                subsections.combat.silent_aim.sub:AddToggle('silent_targetadmins', {Text = 'target admins', Default = false})
+            end
+        end
+        --weapon mods
+        do
+            sections.combat.weapon_mods:AddSlider('recoil', {Text = 'recoil', Compact = true, Rounding = 0, Default = 100, Min = 0, Max = 100, Suffix = '%'})
+        end
+        --antiaim
+        do
+
+        end
+        --killaura
+        do
+            subsections.combat.killaura.main:AddToggle('killaura', {Text = 'enabled', Default = false}):AddKeyPicker('walkspeed_key', {Default = 'None', NoUI = true})
+            subsections.combat.killaura.main:AddSlider('killaura_distance', {Text = 'max distance', Compact = true, Rounding = 0, Default = 25, Min = 10, Max = 25, Suffix = ' studs'})
+            subsections.combat.killaura.main:AddSlider('killaura_attackcooldown', {Text = 'attackcooldown', Compact = true, Rounding = 1, Default = 0.1, Min = 0, Max = 1, Suffix = ' second(s)'})
+            -- subsection
+            do
+                subsections.combat.killaura.sub:AddToggle('killaura_teamcheck', {Text = 'teamcheck [Need to add]', Default = true})
+                subsections.combat.killaura.sub:AddToggle('killaura_targetsleepers', {Text = 'target sleepers', Default = false})
+                subsections.combat.killaura.sub:AddToggle('killaura_targetadmins', {Text = 'target admins', Default = false})
+                subsections.combat.killaura.sub:AddToggle('killaura_showrange', {Text = 'show range', Default = false}):AddColorPicker('killaura_showrange_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            end
+        end
+    end
+    -- visuals
+    do
+        -- player esp
+        do
+            subsections.visuals.player_esp.main:AddToggle('playeresp_toggle', {Text = 'enabled', Default = false}):AddKeyPicker('playeresp_key', {Default = 'None', NoUI = true, Callback = function(boolean) Toggles.playeresp_toggle:SetValue(boolean) end})
+            subsections.visuals.player_esp.main:AddToggle('playeresp_box', {Text = 'box', Default = false}):AddColorPicker('playeresp_box_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            subsections.visuals.player_esp.main:AddDropdown('playeresp_boxtype', {Text = 'box type', Default = 1, Values = {'full', 'corner'}})
+            subsections.visuals.player_esp.main:AddToggle('playeresp_weapon', {Text = 'weapon', Default = false}):AddColorPicker('playeresp_weapon_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            subsections.visuals.player_esp.main:AddToggle('playeresp_distance', {Text = 'distance', Default = false}):AddColorPicker('playeresp_distance_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            subsections.visuals.player_esp.main:AddToggle('playeresp_healthbar', {Text = 'healthbar', Default = false}):AddColorPicker('playeresp_healthbar_colour', {Default = colour3_fromrgb(0, 255, 0)})
+            subsections.visuals.player_esp.main:AddDropdown('playeresp_healthbarpos', {Text = 'health position', Default = 1, Values = {'right', 'left'}})
+            subsections.visuals.player_esp.main:AddToggle('playeresp_name', {Text = 'name', Default = false}):AddColorPicker('playeresp_name_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            -- subsection
+            do
+                subsections.visuals.player_esp.sub:AddToggle('playeresp_limit_distance', {Text = 'limit distance', Default = false})
+                subsections.visuals.player_esp.sub:AddSlider('playeresp_distance_limit', {Text = 'distance', Rounding = 0, Default = 2000, Min = 1, Max = 2000, Suffix = ' studs'})
+                subsections.visuals.player_esp.sub:AddDropdown('playeresp_font', {Text = 'font', Default = 2, Values = {'system', 'plex', 'monospace'}})
+                subsections.visuals.player_esp.sub:AddSlider('playeresp_textsize', {Text = 'text size', Rounding = 0, Default = 15, Min = 1, Max = 25, Suffix = 'px'})
+                subsections.visuals.player_esp.sub:AddToggle('playeresp_textoutline', {Text = 'text outline', Default = true})
+                subsections.visuals.player_esp.sub:AddToggle('playeresp_boxoutline', {Text = 'box outline', Default = true})
+
+            end
+        end
+        -- sleeper esp
+        do
+            subsections.visuals.sleeper_esp.main:AddToggle('sleeperesp_toggle', {Text = 'enabled', Default = false}):AddKeyPicker('sleeperesp_key', {Default = 'None', NoUI = true, Callback = function(boolean) Toggles.sleeperesp_toggle:SetValue(boolean) end})
+            subsections.visuals.sleeper_esp.main:AddToggle('sleeperesp_box', {Text = 'box', Default = false}):AddColorPicker('sleeperesp_box_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            subsections.visuals.sleeper_esp.main:AddDropdown('sleeperesp_boxtype', {Text = 'box type', Default = 1, Values = {'full', 'corner'}})
+            subsections.visuals.sleeper_esp.main:AddToggle('sleeperesp_distance', {Text = 'distance', Default = false}):AddColorPicker('sleeperesp_distance_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            subsections.visuals.sleeper_esp.main:AddToggle('sleeperesp_name', {Text = 'name', Default = false}):AddColorPicker('sleeperesp_name_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            -- subsection
+            do
+                subsections.visuals.sleeper_esp.sub:AddToggle('sleeperesp_limit_distance', {Text = 'limit distance', Default = false})
+                subsections.visuals.sleeper_esp.sub:AddSlider('sleeperesp_distance_limit', {Text = 'distance', Rounding = 0, Default = 2000, Min = 1, Max = 2000, suffix = ' studs'})
+                subsections.visuals.sleeper_esp.sub:AddDropdown('sleeperesp_font', {Text = 'font', Default = 2, Values = {'system', 'plex', 'monospace'}})
+                subsections.visuals.sleeper_esp.sub:AddSlider('sleeperesp_textsize', {Text = 'text size', Rounding = 0, Default = 15, Min = 1, Max = 25, suffix = 'px'})
+                subsections.visuals.sleeper_esp.sub:AddToggle('sleeperesp_textoutline', {Text = 'text outline', Default = true})
+                subsections.visuals.sleeper_esp.sub:AddToggle('sleeperesp_boxoutline', {Text = 'box outline', Default = true})
+
+            end
+        end
+        -- admin esp
+        do
+            subsections.visuals.admin_esp.main:AddToggle('adminesp_toggle', {Text = 'enabled', Default = false}):AddKeyPicker('adminesp_key', {Default = 'None', NoUI = true, Callback = function(boolean) Toggles.sleeperesp_toggle:SetValue(boolean) end})
+            subsections.visuals.admin_esp.main:AddToggle('adminesp_box', {Text = 'box', Default = false}):AddColorPicker('adminesp_box_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            subsections.visuals.admin_esp.main:AddDropdown('adminesp_boxtype', {Text = 'box type', Default = 1, Values = {'full', 'corner'}})
+            subsections.visuals.admin_esp.main:AddToggle('adminesp_distance', {Text = 'distance', Default = false}):AddColorPicker('adminesp_distance_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            subsections.visuals.admin_esp.main:AddToggle('adminesp_healthbar', {Text = 'healthbar', Default = false}):AddColorPicker('adminesp_healthbar_colour', {Default = colour3_fromrgb(0, 255, 0)})
+            subsections.visuals.admin_esp.main:AddDropdown('adminesp_healthbarpos', {Text = 'health position', Default = 1, Values = {'right', 'left'}})
+            subsections.visuals.admin_esp.main:AddToggle('adminesp_name', {Text = 'name', Default = false}):AddColorPicker('adminesp_name_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            -- subsection
+            do
+                subsections.visuals.admin_esp.sub:AddToggle('adminesp_limit_distance', {Text = 'limit distance', Default = false})
+                subsections.visuals.admin_esp.sub:AddSlider('adminesp_distance_limit', {Text = 'distance', Rounding = 0, Default = 2000, Min = 1, Max = 2000, suffix = ' studs'})
+                subsections.visuals.admin_esp.sub:AddDropdown('adminesp_font', {Text = 'font', Default = 2, Values = {'system', 'plex', 'monospace'}})
+                subsections.visuals.admin_esp.sub:AddSlider('adminesp_textsize', {Text = 'text size', Rounding = 0, Default = 15, Min = 1, Max = 25, suffix = 'px'})
+                subsections.visuals.admin_esp.sub:AddToggle('adminesp_textoutline', {Text = 'text outline', Default = true})
+                subsections.visuals.admin_esp.sub:AddToggle('adminesp_boxoutline', {Text = 'box outline', Default = true})
+
+            end
+        end
+    end
+    -- local
+    do
+        -- walkspeed
+        do
+            sections._local.walkspeed:AddToggle('walkspeed_toggle', {Text = 'enabled', Default = false}):AddKeyPicker('walkspeed_key', {Default = 'None', NoUI = true})
+            sections._local.walkspeed:AddSlider('walkspeed_slider', {Text = 'speed', Compact = true, Rounding = 0, Default = 24, Min = 12, Max = 32, Suffix = ''})
+        end
+        -- local chams
+        do
+            sections._local.local_chams:AddToggle('armchams_toggle', {Text = 'arm chams', Default = false}):AddColorPicker('armchams_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            sections._local.local_chams:AddDropdown('armchams_material', {Text = 'material', Default = 2, Multi = false, Values = {'Plastic', 'ForceField', 'Neon', 'SmoothPlastic'}})
+            sections._local.local_chams:AddToggle('weaponchams_toggle', {Text = 'weapon chams', Default = false}):AddColorPicker('weaponchams_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            sections._local.local_chams:AddDropdown('weaponchams_material', {Text = 'material', Default = 2, Multi = false, Values = {'Plastic', 'ForceField', 'Neon', 'SmoothPlastic'}})
+        end
+        -- field of view
+        do
+            sections._local.fieldofview:AddToggle('fieldofview_toggle', {Text = 'enabled', Default = false}):AddKeyPicker('fieldofview_key', {Default = 'None', NoUI = true})
+            sections._local.fieldofview:AddSlider('fieldofview_amount', {Text = 'field of view', Default = 70, Min = 0, Max = 120, Rounding = 0, Suffix = '°'})
+        end
+        --zoom
+        do
+            sections._local.zoom:AddToggle('zoom_toggle', {Text = 'enabled', Default = false}):AddKeyPicker('zoom_key', {Default = 'None', NoUI = true, Mode = ''})
+            sections._local.zoom:AddSlider('zoom_amount', {Text = 'field of view', Default = 30, Min = 0, Max = 120, Rounding = 0, Suffix = '°'})
+        end
+        --misc
+        do
+            sections._local.misc:AddToggle('quick_loot', {Text = 'quick loot', Default = false})
+            sections._local.misc:AddToggle('fast_swing', {Text = 'fast swing', Default = false})
+        end
+    end
+    --world
+    do
+        --exploits
+        do
+            sections.world.exploits:AddToggle('spamsound_toggle', {Text = 'spam sound', Default = false})
+            sections.world.exploits:AddDropdown('spamming_sound', {Text = 'sound to spam', Default = 1, Values = sounds_list})
+            sections.world.exploits:AddToggle('silentwalk_toggle', {Text = 'silent walk', Default = false})
+            sections.world.exploits:AddToggle('nosound_toggle', {Text = 'block sound [does nothing]', Default = false})
+        end
+        --misc
+        do
+            sections.world.misc:AddToggle('ambient', {Text = 'ambient', Default = false}):AddColorPicker('ambient_colour', {Default = colour3_fromrgb(255, 255, 255)})
+            sections.world.misc:AddToggle('remove_shadows', {Text = 'remove shadows', Default = false})
+            sections.world.misc:AddToggle('remove_fog', {Text = 'remove fog', Default = false})
+            sections.world.misc:AddToggle('remove_grass', {Text = 'remove grass', Default = false})
+        end
+    end
+    -- ui settings
+    do
+        sections.ui.ui_settings:AddLabel('made by "mainstreamed"')
+        sections.ui.ui_settings:AddLabel('menu keybind'):AddKeyPicker('menu_keybind', {Default = 'Delete', NoUI = true})
+        sections.ui.ui_settings:AddToggle('watermark', {Text = 'watermark', Default = true, Callback = function(boolean) watermark.Visible = boolean end})
+        sections.ui.ui_settings:AddButton('Unload', unloadAll)
+        library.ToggleKeybind = Options.menu_keybind
+        -- themes
+        theme_manager:SetLibrary(library)
+        theme_manager:SetFolder('mainstreamed')
+        theme_manager:ApplyToTab(tabs.ui)
+        -- configs
+        save_manager:SetLibrary(library)
+        save_manager:SetFolder('mainstreamed/13800223141')
+        save_manager:BuildConfigSection(tabs.ui)
+    end
+end
+-- script setup
+do
+    --tool instances
+    for _, tool in next, framework.variables.tools:GetChildren() do
+        local tool_worldmodel = tool:FindFirstChild('Worldmodel')
+        if (tool_worldmodel) then
+            local value = instance_new('StringValue', tool_worldmodel)
+            value.Value = tool.Name
+            value.Name = 'name'
+        end
+    end
+    --field of view change thing
+    local propchanged_connection; propchanged_connection = camera:GetPropertyChangedSignal('FieldOfView'):Connect(function()
+        if (Toggles.zoom_toggle.Value and Options.zoom_key.Value ~= 'None' and Options.zoom_key:GetState()) then
+            camera.FieldOfView = Options.zoom_amount.Value
+        elseif (Toggles.fieldofview_toggle.Value) then
+            camera.FieldOfView = Options.fieldofview_amount.Value
+        end
+    end)
+    --camera viewmodel thing
+    local camera_childadded; camera_childadded = camera.ChildAdded:Connect(function(instance)
+        if (Toggles.weaponchams_toggle.Value) then
+            for _, child in instance:GetChildren() do
+                if (child:IsA('Model')) then
+                    framework:chamModel(instance, Options.weaponchams_material.Value, Options.weaponchams_colour.Value)
+                end
+            end
+        end
+        if (Toggles.armchams_toggle.Value) then
+            framework:chamModel(instance, Options.armchams_material.Value, Options.armchams_colour.Value, true)
+        end
+    end)
+    table_insert(uninject_table.connections, propchanged_connection)
+    table_insert(uninject_table.connections, camera_childadded)
+
+    -- loading esp
+    do
+        for _, player in next, players:GetChildren() do
+            framework:add_player(player)
+        end
+        local pAdded; pAdded = players.ChildAdded:Connect(function(player)
+            framework:add_player(player)
+        end)
+        for _, model in next, framework.variables.sleepers:GetChildren() do
+            framework:add_sleeper(model)
+        end
+        local sAdded; sAdded = framework.variables.sleepers.ChildAdded:Connect(function(model)
+            framework:add_sleeper(model)
+        end)
+        table_insert(uninject_table.connections, sAdded)
+        table_insert(uninject_table.connections, pAdded)
+    end
+    -- loop
+    local main_loop; main_loop = runservice.Heartbeat:Connect(framework.loop_function)
+    table_insert(uninject_table.connections, main_loop)
+    -- bypasses
+    do
+        local old_namecall; old_namecall = hookmetamethod(game, '__namecall', newcclosure(function(self, ...)
+            local method = getnamecallmethod()
+            local args = {...}
+            if (not checkcaller()) then
+                local upvals = #debug.getupvalues(3)
+                if (method == 'Raycast') then
+                    if (framework.target.silent.player and (upvals == 11 or upvals == 12) and args[1] == camera.CFrame.Position) then
+                        args[2] = framework.target.silent.vector3 - args[1]
+                    end
+                elseif (method == 'FireServer') then
+                    if (Toggles.nosound_toggle.Value and args[1] == 'Replicate Sound') then
+                        return
+                    elseif (args[1] == 'Change Sprinting State' and Toggles.walkspeed_toggle.Value) then
+                        return
+                    elseif (args[1] == 'Change Crouch State' and Toggles.silentwalk_toggle.Value) then
+                        return
+                    end
+                end
+            end
+            return old_namecall(self, unpack(args))	
+        end))
+        local old_index; old_index = hookmetamethod(game, '__index', newcclosure(function(self, attribute)
+            if (not checkcaller() and tostring(getcallingscript()) ~= 'ControlModule') then
+                local inst = tost(self)
+                local inst_bypass = framework.bypass.instances[inst]
+                local attr_bypass = framework.bypass.attributes[attribute]
+                if (inst_bypass and inst_bypass[attribute]) then
+                    return inst_bypass[attribute].value
+                elseif (attr_bypass) then
+                    return attr_bypass.value
+                elseif (attribute == 'CameraMode' and self == local_player) then
+                    return Enum.CameraMode.LockFirstPerson
+                elseif (self == userinputservice) then
+                    if (attribute == 'OverrideMouseIconBehavior') then
+                        return Enum.OverrideMouseIconBehavior.ForceShow
+                    elseif (attribute == 'MouseBehavior') then
+                        return Enum.MouseBehavior.LockCenter
+                    end
+                end
+            end
+            return old_index(self, attribute)
+        end))
+        local old_newindex; old_newindex = hookmetamethod(game, '__newindex', newcclosure(function(self, attribute, value)
+            if (not checkcaller()) then
+                local inst = tost(self)
+                local inst_bypass = framework.bypass.instances[inst]
+                local attr_bypass = framework.bypass.attributes[attribute]
+                if (inst_bypass and inst_bypass[attribute]) then
+                    inst_bypass[attribute].value = value
+                    if (Toggles[inst_bypass[attribute].condition].Value) then
+                        return
+                    end
+                elseif (attr_bypass) then
+                    attr_bypass.value = value
+                    if (framework.bypass.conditions[attr_bypass.condition]) then
+                        return
+                    end
+                end
+            end
+            return old_newindex(self, attribute, value)
+        end))
+    end
+    -- hooks
+    do
+        local quickloot_ran = 0
+        local fastwing_ran = 0
+        local old_taskwait = getrenv().task.wait
+        setreadonly(getrenv().task, false)
+        getrenv().task.wait = function(time)
+            local callingscript = tostring(getcallingscript())
+            if (Toggles.quick_loot.Value and callingscript == 'SpriteSheetPlayer' and string.find(tostring(time), '3333333')) then
+                quickloot_ran += 1
+                if (quickloot_ran == 8) then
+                    quickloot_ran = 0
+                    return old_taskwait()
+                end
+                return
+            elseif (Toggles.fast_swing.Value and callingscript == 'Startup' and not time) then
+                fastwing_ran += 1
+                if (fastwing_ran == 4) then
+                    fastwing_ran = 0
+                    return old_taskwait()
+                end
+                return 
+            end
+            return old_taskwait(time)
+        end
+        setreadonly(getrenv().task, true)
+    end
+end
+-- onchanged
+do
+    -- silent aim
+    do
+        Options.silent_snapline_colour:OnChanged(function(colour)
+            framework.drawings.silent_snapline.Color = colour
+        end)
+        Toggles.silent_draw_fov:OnChanged(function(boolean)
+            framework.drawings.silent_fov_circle.Visible = boolean
+        end)
+        Options.silent_fov_colour:OnChanged(function(colour)
+            framework.drawings.silent_fov_circle.Color = colour
+        end)
+        Options.silent_fov_size:OnChanged(function(value)
+            framework.drawings.silent_fov_circle.Radius = value
+        end)
+    end
+    --killaura
+    do
+        Toggles.killaura:OnChanged(function(boolean)
+            if (boolean and Toggles.killaura_showrange.Value) then
+                framework.settings.killaura_circle = true
+            else
+                framework.settings.killaura_circle = false
+                framework.target.killaura_rangecircle.Position = vector3_new(0, -999, 0)
+            end
+        end)
+        Toggles.killaura_showrange:OnChanged(function(boolean)
+            if (boolean and Toggles.killaura.Value) then
+                framework.settings.killaura_circle = true
+            else
+                framework.settings.killaura_circle = false
+                framework.target.killaura_rangecircle.Position = vector3_new(0, -999, 0)
+            end
+        end)
+        Options.killaura_distance:OnChanged(function(value)
+            framework.target.killaura_rangecircle.Size = vector3_new(value * 0.7, 0.01, value * 0.7)
+        end)
+        Options.killaura_showrange_colour:OnChanged(function(colour)
+            framework.target.killaura_rangecircle.Color = colour
+        end)
+    end
+    -- recoil
+    do
+        Options.recoil:OnChanged(function(value)
+            local decimal = value / 100
+            local pData = framework.variables.playerdata
+            for gun, values in next, framework.old_playerdata do
+                pData[gun].XScale = values.XScale * decimal
+                pData[gun].YScale = values.YScale * decimal
+            end
+        end)
+    end 
+    -- zoom
+    do
+        Toggles.zoom_toggle:OnChanged(function(boolean)
+            camera.FieldOfView = 70
+        end)
+        Options.zoom_key:OnClick(function()
+            camera.FieldOfView = 70
+        end)
+    end
+    -- walkspeed
+    do
+        Toggles.walkspeed_toggle:OnChanged(function(boolean)
+            framework.variables.remote_event:FireServer('Change Sprinting State', false, boolean)
+            if (not boolean) then
+                local_player.Character.Humanoid.WalkSpeed = 12
+            end
+        end)
+    end
+    -- localchams
+    do
+        --[[
+        Toggles.armchams_toggle:OnChanged(function(boolean)
+            if (boolean) then
+                framework:cham_model(camera.Viewmodel, Enum.Material[Options.armchams_material.Value], Options.armchams_colour.Value, framework.settings.oldArms)
+            else
+                for _, part in next, camera.Viewmodel:GetDescendants() do
+                    pcall(function()
+                        local old = framework.settings.oldArms[tostring(part)]
+                        if (old) then
+                            part.Material = old.material
+                            part.Color = old.colour
+                        end
+                    end)
+                end
+            end
+            framework.settings.oldArms = {}
+        end)
+        Options.armchams_colour:OnChanged(function(colour)
+            if (Toggles.armchams_toggle.Value) then
+                framework:cham_model(camera.Viewmodel, Enum.Material[Options.armchams_material.Value], colour, framework.settings.oldArms)
+            end
+        end)
+        Options.armchams_material:OnChanged(function(value)
+            if (Toggles.armchams_toggle.Value) then
+                framework:cham_model(camera.Viewmodel, Enum.Material[value], Options.armchams_colour.Value, framework.settings.oldArms)
+            end
+        end)
+        ]]
+    end
+    -- silent walk
+    do
+        Toggles.silentwalk_toggle:OnChanged(function(boolean)
+            framework.variables.remote_event:FireServer('Change Crouch State', false, boolean)
+        end)
+    end
+    -- misc
+    do
+        Toggles.remove_fog:OnChanged(function(boolean)
+            if (boolean) then
+                lighting.FogStart = 9999999
+                lighting.FogEnd = 9999999
+            else
+                lighting.FogStart = framework.bypass.instances.Lighting.FogStart.value
+                lighting.FogEnd = framework.bypass.instances.Lighting.FogEnd.value
+            end
+        end)
+        Toggles.ambient:OnChanged(function(boolean)
+            if (boolean) then
+                lighting.Ambient = Options.ambient_colour.Value
+            else
+                lighting.Ambient = framework.bypass.instances.Lighting.Ambient.value
+            end 
+        end)
+        Options.ambient_colour:OnChanged(function(colour)
+            if (Toggles.ambient.Value) then
+                lighting.Ambient = colour
+            end
+        end)
+        Toggles.remove_shadows:OnChanged(function(boolean)
+            lighting.GlobalShadows = not boolean
+        end)
+        Toggles.remove_grass:OnChanged(function(boolean)
+            sethiddenproperty(terrain, 'Decoration', not boolean)
+        end)
+    end
+end
+
